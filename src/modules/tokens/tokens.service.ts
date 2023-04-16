@@ -15,12 +15,12 @@ export class TokensService {
     private readonly jwtService: JwtService,
   ) {}
 
-  generateJwtTokens(userData: PayloadToken) {
-    const accessToken = this.jwtService.sign(userData, {
+  generateJwtTokens(userDataToken: PayloadToken) {
+    const accessToken = this.jwtService.sign(userDataToken, {
       secret: process.env.JWT_SECRET_ACCESS,
       expiresIn: process.env.JWT_ACCESS_EXPIRE,
     });
-    const refreshToken = this.jwtService.sign(userData, {
+    const refreshToken = this.jwtService.sign(userDataToken, {
       secret: process.env.JWT_SECRET_REFRESH,
       expiresIn: process.env.JWT_REFRESH_EXPIRE,
     });
@@ -28,10 +28,10 @@ export class TokensService {
   }
 
   validateRefreshToken(token: string): PayloadToken {
-    const userData: PayloadToken = this.jwtService.verify(token, {
+    const userDataToken: PayloadToken = this.jwtService.verify(token, {
       secret: process.env.JWT_SECRET_REFRESH,
     });
-    return userData;
+    return userDataToken;
   }
 
   async findToken(refreshToken: string): Promise<TokenEntity> {

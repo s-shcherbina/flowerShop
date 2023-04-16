@@ -1,7 +1,7 @@
 import {
   IsEmail,
-  IsMobilePhone,
   IsNotEmpty,
+  IsPhoneNumber,
   IsString,
   MaxLength,
   MinLength,
@@ -14,7 +14,7 @@ export class CreateUserDTO {
 
   @IsString()
   @IsNotEmpty()
-  @IsMobilePhone()
+  @IsPhoneNumber()
   phone: string;
 
   @IsString()
@@ -23,14 +23,14 @@ export class CreateUserDTO {
 
   @IsString()
   @IsNotEmpty()
-  service: string;
+  delivery: string;
 
   @IsString()
   @IsNotEmpty()
   department: string;
 }
 
-export class CreateSuperUserDTO {
+export class CreateSuperUserDTO extends CreateUserDTO {
   @IsString()
   @IsNotEmpty()
   @IsEmail()
@@ -42,12 +42,12 @@ export class CreateSuperUserDTO {
   @MaxLength(20)
   password: string;
 
-  invite?: string;
+  role?: string;
 }
 
-export class UpdateSuperUserDTO extends CreateUserDTO {
-  @IsString()
-  @IsNotEmpty()
-  @IsEmail()
-  email: string;
-}
+// export class UpdateSuperUserDTO extends CreateUserDTO {
+//   @IsString()
+//   @IsNotEmpty()
+//   @IsEmail()
+//   email: string;
+// }

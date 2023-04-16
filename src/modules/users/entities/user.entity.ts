@@ -21,7 +21,7 @@ export class UserEntity {
   phone: string;
 
   @Column({ nullable: false })
-  service: string;
+  delivery: string;
 
   @Column({ nullable: false })
   locality: string;

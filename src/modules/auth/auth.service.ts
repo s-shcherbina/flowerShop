@@ -9,6 +9,7 @@ import { AuthResponse } from 'src/types';
 import { CreateSuperUserDTO, CreateUserDTO } from 'src/modules/users/dto';
 import { UsersService } from 'src/modules/users/users.service';
 import { LoginSuperUserDTO, LoginUserDTO } from './dto';
+import { UserEntity } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -17,9 +18,11 @@ export class AuthService {
     private readonly tokensService: TokensService,
   ) {}
 
-  async createResponse(id: number, role: string): Promise<AuthResponse> {
-    const userData = { id, role };
-    const tokens = this.tokensService.generateJwtTokens(userData);
+  async createResponse(user: UserEntity): Promise<AuthResponse> {
+    // const { id, role, password, email, createdAt, ...userData } = user;
+    const { id, role } = user;
+    const { email, password, token, order, createdAt, ...userData } = user;
+    const tokens = this.tokensService.generateJwtTokens({ id, role });
     await this.tokensService.saveToken(tokens.refreshToken, id);
     return { userData, ...tokens };
   }
@@ -28,43 +31,26 @@ export class AuthService {
     const existUser = await this.usersService.findUserByPhone(dto.phone);
     if (existUser)
       throw new BadRequestException(
-        `${dto.phone} закріплений за іншим користувачем!`,
+        `${dto.phone} закріплений за (іншим користувачем)!`,
       );
     const user = await this.usersService.createUser(dto);
-    return this.createResponse(user.id, user.role);
+    return await this.createResponse(user);
   }
 
-  async registerSuperUser(
-    id: number,
-    dto: CreateSuperUserDTO,
-  ): Promise<AuthResponse> {
-    const user = await this.usersService.findUserById(id);
-    if (user.role !== 'USER')
-      throw new BadRequestException('Такий користувач вже зареєстрований');
-    let role = 'SUPER_USER';
+  async registerSuperUser(dto: CreateSuperUserDTO): Promise<AuthResponse> {
+    const user = await this.usersService.findUserByPhone(dto.phone);
+    console.log(user?.role);
+    if (user && user.role !== 'USER')
+      throw new BadRequestException(`${dto.phone} вже існує! Увійдіть!`);
+    dto.role = 'SUPER_USER';
     const superUser = await this.usersService.findSuperUserByEmail(dto.email);
     if (superUser)
-      throw new BadRequestException(
-        `${dto.email} закріплений за іншим користувачем!`,
-      );
-    if (dto.invite) {
-      if (dto.invite === process.env.ADMIN_INVITE) {
-        role = 'ADMIN';
-      } else {
-        throw new BadRequestException(
-          'Не достатньо прав на створення адміністратора',
-        );
-      }
-    }
+      throw new BadRequestException(`${dto.email} вже існує! Увійдіть!`);
+    if (dto.email === process.env.MAIN_EMAIL) dto.role = 'ADMIN';
 
     dto.password = await this.usersService.hashPassword(dto.password);
-    await this.usersService.updateToSuperUser(
-      id,
-      role,
-      dto.email,
-      dto.password,
-    );
-    return this.createResponse(id, role);
+    const newSuperUser = await this.usersService.createSuperUser(dto);
+    return await this.createResponse(newSuperUser);
   }
 
   async loginUser(dto: LoginUserDTO): Promise<AuthResponse> {
@@ -73,28 +59,23 @@ export class AuthService {
       throw new BadRequestException(
         `${dto.phone} незакріплений за жодним користувачем!`,
       );
-    if (user.role !== 'USER') {
-      user.role = 'USER ' + user.role.slice(0, 1);
-      await this.usersService.updateRole(user.id, user.role);
-    }
-    return this.createResponse(user.id, user.role);
+    return await this.createResponse({
+      ...user,
+      role: `USER ${user.role.slice(0, 1)}`,
+    });
   }
 
   async loginSuperUser(dto: LoginSuperUserDTO): Promise<AuthResponse> {
-    const existUser = await this.usersService.findSuperUserByEmail(dto.email);
-    if (!existUser)
+    const user = await this.usersService.findSuperUserByEmail(dto.email);
+    if (!user)
       throw new BadRequestException(
         `${dto.email} незакріплений за жодним користувачем!`,
       );
 
-    const validatePassword = await compare(dto.password, existUser.password);
+    const validatePassword = await compare(dto.password, user.password);
     if (!validatePassword) throw new BadRequestException(`Помилка входу!`);
-    if (existUser.role.slice(-1) === 'A') existUser.role = 'ADMIN';
-    if (existUser.role.slice(-1) === 'S') existUser.role = 'SUPER_USER';
 
-    await this.usersService.updateRole(existUser.id, existUser.role);
-
-    return this.createResponse(existUser.id, existUser.role);
+    return await this.createResponse(user);
   }
 
   async logout(refreshToken: string): Promise<string> {
@@ -106,14 +87,22 @@ export class AuthService {
     try {
       if (!refreshToken) throw new UnauthorizedException(`Не авторизований`);
 
-      const userData = this.tokensService.validateRefreshToken(refreshToken);
+      const userDataToken =
+        this.tokensService.validateRefreshToken(refreshToken);
       const tokenFromDb = await this.tokensService.findToken(refreshToken);
-      if (!userData || !tokenFromDb)
+      if (!userDataToken || !tokenFromDb)
         throw new UnauthorizedException(`Не авторизований`);
 
-      return this.createResponse(userData.id, userData.role);
+      const user = await this.usersService.findUserById(userDataToken.id);
+      return this.createResponse(user);
     } catch (e) {
       throw new UnauthorizedException(`Не авторизований`);
     }
   }
+
+  // async updateUser(id: number, dto: CreateUserDTO): Promise<AuthResponse> {
+  //   await this.usersService.updateUser(id, dto);
+  //   const user = await this.usersService.findUserById(id);
+  //   return await this.createResponse(user);
+  // }
 }

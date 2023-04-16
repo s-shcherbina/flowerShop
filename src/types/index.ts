@@ -1,10 +1,12 @@
+import { CreateUserDTO } from 'src/modules/users/dto';
+
 export interface PayloadToken {
   id: number;
   role: string;
 }
 
 export interface AuthResponse {
-  userData: PayloadToken;
+  userData: CreateUserDTO;
   accessToken: string;
   refreshToken: string;
 }
